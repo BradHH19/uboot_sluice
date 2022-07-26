@@ -1,0 +1,7 @@
+MX6ULAUTOMMIC BOARD
+M:	huangjinlong <huangjinlong@automic.com>
+S:	Maintained
+F:	board/automic/mx6ul_14x14_automic/
+F:	include/configs/mx6ul_14x14_automic.h
+F:	configs/mx6ul_14x14_automic_emmc_defconfig
+F:	configs/mx6ul_9x9_automic_defconfig
