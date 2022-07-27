@@ -67,10 +67,12 @@ int demo_set_light(struct udevice *dev, int light)
 int demo_parse_dt(struct udevice *dev)
 {
 	struct dm_demo_pdata *pdata = dev_get_plat(dev);
-	int dn = dev_of_offset(dev);
-
-	pdata->sides = fdtdec_get_int(gd->fdt_blob, dn, "sides", 0);
-	pdata->colour = fdt_getprop(gd->fdt_blob, dn, "colour", NULL);
+	uint32_t temp_u32 = 0;
+	ofnode_read_u32(dev_ofnode(dev),"sides",&temp_u32 );
+	pdata->sides = temp_u32;
+	pdata->colour = ofnode_read_string(dev_ofnode(dev),"colour");
+	//pdata->sides = fdtdec_get_int(gd->fdt_blob, dn, "sides", 0);//ofnode_read_u32()
+	//pdata->colour = fdt_getprop(gd->fdt_blob, dn, "colour", NULL);
 	if (!pdata->sides || !pdata->colour) {
 		debug("%s: Invalid device tree data\n", __func__);
 		return -EINVAL;

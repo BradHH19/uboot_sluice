@@ -3,7 +3,9 @@
 #include <asm/global_data.h>
 
 #if CONFIG_IS_ENABLED(UNIT_TEST)
-#define DEBUG
+  #ifndef DEBUG
+    #define DEBUG
+  #endif
 #endif
 
 #include <malloc.h>
