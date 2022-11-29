@@ -283,7 +283,7 @@ static int setup_fec(void)
 
 int board_phy_config(struct phy_device *phydev)
 {
-	//phy_write(phydev, MDIO_DEVAD_NONE, 0x1f, 0x8190);
+	//phy_write(phydev, MDIO_DEVAD_NONE, 0x1f, 0x8190); KSZ8XXX
 
 	if (phydev->drv->config)
 		phydev->drv->config(phydev);
