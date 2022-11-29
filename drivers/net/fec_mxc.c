@@ -1361,7 +1361,7 @@ static int fecmxc_probe(struct udevice *dev)
 	struct mii_dev *bus = NULL;
 	uint32_t start;
 	int ret;
-
+	debug("%s\n",__func__);
 	if (CONFIG_IS_ENABLED(IMX_MODULE_FUSE)) {
 		if (enet_fused((ulong)priv->eth)) {
 			printf("SoC fuse indicates Ethernet@0x%lx is unavailable.\n", (ulong)priv->eth);
@@ -1590,6 +1590,7 @@ static int fecmxc_of_to_plat(struct udevice *dev)
 #if CONFIG_IS_ENABLED(DM_GPIO)
 	ret = gpio_request_by_name(dev, "phy-reset-gpios", 0,
 				   &priv->phy_reset_gpio, GPIOD_IS_OUT);
+	debug("Request \"phy-reset-gpios\" result:%d\nproperty is optional, don't return error!\n",ret);
 	if (ret < 0)
 		return 0; /* property is optional, don't return error! */
 

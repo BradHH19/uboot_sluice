@@ -69,7 +69,6 @@ struct mii_dev *eth_phy_get_mdio_bus(struct udevice *eth_dev)
 	int ret;
 	struct udevice *phy_dev;
 	struct eth_phy_device_priv *uc_priv;
-
 	/* Will probe the parent of phy device, then phy device */
 	ret = uclass_get_device_by_phandle(UCLASS_ETH_PHY, eth_dev,
 					   "phy-handle", &phy_dev);

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2015 Freescale Semiconductor, Inc.
+ * Copyright (C) 2022 Beijing Automic Technology Co.,ltd.
  */
 
 #include <init.h>
-#include <net.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/iomux.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/crm_regs.h>
-#include <asm/arch/mx6ul_pins.h>
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/global_data.h>
@@ -19,21 +17,17 @@
 #include <asm/mach-imx/mxc_i2c.h>
 #include <asm/io.h>
 #include <common.h>
-#include <command.h>
 #include <env.h>
 #include <fsl_esdhc_imx.h>
 #include <i2c.h>
 #include <miiphy.h>
-#include <linux/delay.h>
 #include <linux/sizes.h>
+#include <linux/delay.h>
 #include <mmc.h>
-#include <netdev.h>
+#include <miiphy.h>
 #include <power/pmic.h>
 #include <power/pfuze3000_pmic.h>
 #include "../../freescale/common/pfuze.h"
-#include <usb.h>
-#include <usb/ehci-ci.h>
-#include <splash.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -46,26 +40,13 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_DSE_40ohm | PAD_CTL_HYS |			\
 	PAD_CTL_ODE)
 
-#define ENET_PAD_CTRL  (PAD_CTL_PUS_100K_UP | PAD_CTL_PUE |     \
-	PAD_CTL_SPEED_HIGH   |                                  \
-	PAD_CTL_DSE_48ohm   | PAD_CTL_SRE_FAST)
+#define LCD_PAD_CTRL    (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
+	PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
 
 #define GPMI_PAD_CTRL0 (PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_PUS_100K_UP)
 #define GPMI_PAD_CTRL1 (PAD_CTL_DSE_40ohm | PAD_CTL_SPEED_MED | \
 			PAD_CTL_SRE_FAST)
 #define GPMI_PAD_CTRL2 (GPMI_PAD_CTRL0 | GPMI_PAD_CTRL1)
-
-#define LCD_PAD_CTRL    (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | \
-	PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm)
-
-#define MDIO_PAD_CTRL  (PAD_CTL_PUS_100K_UP | PAD_CTL_PUE |     \
-	PAD_CTL_DSE_48ohm   | PAD_CTL_SRE_FAST | PAD_CTL_ODE)
-
-#define ENET_CLK_PAD_CTRL  (PAD_CTL_DSE_40ohm   | PAD_CTL_SRE_FAST)
-
-#define OTG_ID_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_PUE |		\
-	PAD_CTL_PUS_47K_UP  | PAD_CTL_SPEED_LOW |		\
-	PAD_CTL_DSE_80ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
 
 
 static int check_mmc_autodetect(void)
@@ -191,95 +172,40 @@ static iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_UART1_RX_DATA__UART1_DCE_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
-
 static void setup_iomux_uart(void)
 {
 	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 }
 
 #ifdef CONFIG_FSL_QSPI
+
+#ifndef CONFIG_DM_SPI
+#define QSPI_PAD_CTRL1	\
+	(PAD_CTL_SRE_FAST | PAD_CTL_SPEED_MED | \
+	 PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_120ohm)
+
+static iomux_v3_cfg_t const quadspi_pads[] = {
+	MX6_PAD_NAND_WP_B__QSPI_A_SCLK | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+	MX6_PAD_NAND_READY_B__QSPI_A_DATA00 | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+	MX6_PAD_NAND_CE0_B__QSPI_A_DATA01 | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+	MX6_PAD_NAND_CE1_B__QSPI_A_DATA02 | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+	MX6_PAD_NAND_CLE__QSPI_A_DATA03 | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+	MX6_PAD_NAND_DQS__QSPI_A_SS0_B | MUX_PAD_CTRL(QSPI_PAD_CTRL1),
+};
+#endif
+
 static int board_qspi_init(void)
 {
+#ifndef CONFIG_DM_SPI
+	/* Set the iomux */
+	imx_iomux_v3_setup_multiple_pads(quadspi_pads,
+					 ARRAY_SIZE(quadspi_pads));
+#endif
 	/* Set the clock */
 	enable_qspi_clk(0);
 
 	return 0;
 }
-#endif
-
-#ifdef CONFIG_SPL_BUILD
-
-#define USDHC_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_PUE |		\
-	PAD_CTL_PUS_22K_UP  | PAD_CTL_SPEED_LOW |		\
-	PAD_CTL_DSE_80ohm   | PAD_CTL_SRE_FAST  | PAD_CTL_HYS)
-
-static iomux_v3_cfg_t const usdhc2_pads[] = {
-	MX6_PAD_NAND_RE_B__USDHC2_CLK | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NAND_WE_B__USDHC2_CMD | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NAND_DATA00__USDHC2_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NAND_DATA01__USDHC2_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NAND_DATA02__USDHC2_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-	MX6_PAD_NAND_DATA03__USDHC2_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
-};
-
-static struct fsl_esdhc_cfg usdhc_cfg[1] = {
-	{USDHC2_BASE_ADDR, 0, 4},
-};
-
-int board_mmc_getcd(struct mmc *mmc)
-{
-	return 1;
-}
-
-int board_mmc_init(struct bd_info *bis)
-{
-	imx_iomux_v3_setup_multiple_pads(usdhc2_pads, ARRAY_SIZE(usdhc2_pads));
-	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC2_CLK);
-	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
-}
-#endif
-
-#ifdef CONFIG_USB_EHCI_MX6
-#ifndef CONFIG_DM_USB
-
-#define USB_OTHERREGS_OFFSET	0x800
-#define UCTRL_PWR_POL		(1 << 9)
-
-static iomux_v3_cfg_t const usb_otg_pads[] = {
-	MX6_PAD_GPIO1_IO00__ANATOP_OTG1_ID | MUX_PAD_CTRL(OTG_ID_PAD_CTRL),
-};
-
-/* At default the 3v3 enables the MIC2026 for VBUS power */
-static void setup_usb(void)
-{
-	imx_iomux_v3_setup_multiple_pads(usb_otg_pads,
-					 ARRAY_SIZE(usb_otg_pads));
-}
-
-int board_usb_phy_mode(int port)
-{
-	if (port == 1)
-		return USB_INIT_HOST;
-	else
-		return usb_phy_mode(port);
-}
-
-int board_ehci_hcd_init(int port)
-{
-	u32 *usbnc_usb_ctrl;
-
-	if (port > 1)
-		return -EINVAL;
-
-	usbnc_usb_ctrl = (u32 *)(USB_BASE_ADDR + USB_OTHERREGS_OFFSET +
-				 port * 4);
-
-	/* Set Power polarity */
-	setbits_le32(usbnc_usb_ctrl, UCTRL_PWR_POL);
-
-	return 0;
-}
-#endif
 #endif
 
 #ifdef CONFIG_NAND_MXS
@@ -358,8 +284,7 @@ static int setup_fec(void)
 int board_phy_config(struct phy_device *phydev)
 {
 	//phy_write(phydev, MDIO_DEVAD_NONE, 0x1f, 0x8190);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1f, 0x07);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xf3, 0x10);
+
 	if (phydev->drv->config)
 		phydev->drv->config(phydev);
 
@@ -370,7 +295,7 @@ int board_phy_config(struct phy_device *phydev)
 #ifdef CONFIG_DM_VIDEO
 static iomux_v3_cfg_t const lcd_pads[] = {
 	/* Use GPIO for Brightness adjustment, duty cycle = period. */
-	MX6_PAD_GPIO1_IO08__GPIO1_IO08 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_GPIO1_IO04__GPIO1_IO04 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
 static int setup_lcd(void)
@@ -380,14 +305,14 @@ static int setup_lcd(void)
 	imx_iomux_v3_setup_multiple_pads(lcd_pads, ARRAY_SIZE(lcd_pads));
 
 	/* Reset the LCD */
-	gpio_request(IMX_GPIO_NR(5, 2), "lcd reset");
-	gpio_direction_output(IMX_GPIO_NR(5, 2) , 0);
+	gpio_request(IMX_GPIO_NR(5, 7), "lcd reset");
+	gpio_direction_output(IMX_GPIO_NR(5, 7) , 0);
 	udelay(500);
-	gpio_direction_output(IMX_GPIO_NR(5, 2) , 1);
+	gpio_direction_output(IMX_GPIO_NR(5, 7) , 1);
 
 	/* Set Brightness to high */
-	gpio_request(IMX_GPIO_NR(1, 8), "backlight");
-	gpio_direction_output(IMX_GPIO_NR(1, 8) , 1);
+	gpio_request(IMX_GPIO_NR(1, 4), "backlight");
+	gpio_direction_output(IMX_GPIO_NR(1, 4) , 1);
 
 	return 0;
 }
@@ -407,14 +332,8 @@ int board_init(void)
 	/* Address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
-#ifdef CONFIG_FEC_MXC
+#ifdef	CONFIG_FEC_MXC
 	setup_fec();
-#endif
-
-#ifdef CONFIG_USB_EHCI_MX6
-#ifndef CONFIG_DM_USB
-	setup_usb();
-#endif
 #endif
 
 #ifdef CONFIG_FSL_QSPI
@@ -450,12 +369,17 @@ int board_late_init(void)
 #endif
 
 #ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
-	env_set("board_name", "AUTOMIC");
+	env_set("board_name", "Sluice");
 
-	if (is_mx6ul_9x9_automic())
+	if (is_mx6ull_9x9_sluice())
 		env_set("board_rev", "9X9");
 	else
 		env_set("board_rev", "14X14");
+
+	if (is_cpu_type(MXC_CPU_MX6ULZ)) {
+		env_set("board_name", "ULZ-SLUICE");
+		env_set("usb_net_cmd", "usb start");
+    }
 #endif
 
 	setup_lcd();
@@ -471,213 +395,12 @@ int board_late_init(void)
 
 int checkboard(void)
 {
-	if (is_mx6ul_9x9_automic())
-		puts("Board: MX6UL 9x9 AUTOMIC\n");
+	if (is_mx6ull_9x9_sluice())
+		puts("Board: MX6ULL 9x9 SLUICE\n");
+	else if (is_cpu_type(MXC_CPU_MX6ULZ))
+		puts("Board: MX6ULZ 14x14 SLUICE\n");
 	else
-		puts("Board: MX6UL 14x14 AUTOMIC\n");
+		puts("Board: MX6ULL 14x14 SLUICE\n");
 
 	return 0;
 }
-#if defined(CONFIG_SPLASH_SOURCE) 
-static struct splash_location splash_locations[] = {
-
-	{
-		.name = "mmc_fs",
-		.storage = SPLASH_STORAGE_MMC,
-		.flags = SPLASH_STORAGE_FS,
-		.devpart = "1:1",
-	}
-};
-
-int splash_screen_prepare(void)
-{
-	return splash_source_load(splash_locations,
-					ARRAY_SIZE(splash_locations));
-}
-
-#endif
-
-/*
- * Backlight off and reset LCD before OS handover
- */
-void board_preboot_os(void)
-{
-	gpio_set_value(IMX_GPIO_NR(1, 8), 0);
-	//gpio_set_value(IMX_GPIO_NR(5, 2), 0);
-}
-
-#ifdef CONFIG_SPL_BUILD
-#include <linux/libfdt.h>
-#include <spl.h>
-#include <asm/arch/mx6-ddr.h>
-
-
-static struct mx6ul_iomux_grp_regs mx6_grp_ioregs = {
-	.grp_addds = 0x00000030,
-	.grp_ddrmode_ctl = 0x00020000,
-	.grp_b0ds = 0x00000030,
-	.grp_ctlds = 0x00000030,
-	.grp_b1ds = 0x00000030,
-	.grp_ddrpke = 0x00000000,
-	.grp_ddrmode = 0x00020000,
-#ifdef CONFIG_TARGET_MX6UL_9X9_EVK
-	.grp_ddr_type = 0x00080000,
-#else
-	.grp_ddr_type = 0x000c0000,
-#endif
-};
-
-#ifdef CONFIG_TARGET_MX6UL_9X9_EVK
-static struct mx6ul_iomux_ddr_regs mx6_ddr_ioregs = {
-	.dram_dqm0 = 0x00000030,
-	.dram_dqm1 = 0x00000030,
-	.dram_ras = 0x00000030,
-	.dram_cas = 0x00000030,
-	.dram_odt0 = 0x00000000,
-	.dram_odt1 = 0x00000000,
-	.dram_sdba2 = 0x00000000,
-	.dram_sdclk_0 = 0x00000030,
-	.dram_sdqs0 = 0x00003030,
-	.dram_sdqs1 = 0x00003030,
-	.dram_reset = 0x00000030,
-};
-
-static struct mx6_mmdc_calibration mx6_mmcd_calib = {
-	.p0_mpwldectrl0 = 0x00000000,
-	.p0_mpdgctrl0 = 0x20000000,
-	.p0_mprddlctl = 0x4040484f,
-	.p0_mpwrdlctl = 0x40405247,
-	.mpzqlp2ctl = 0x1b4700c7,
-};
-
-static struct mx6_lpddr2_cfg mem_ddr = {
-	.mem_speed = 800,
-	.density = 2,
-	.width = 16,
-	.banks = 4,
-	.rowaddr = 14,
-	.coladdr = 10,
-	.trcd_lp = 1500,
-	.trppb_lp = 1500,
-	.trpab_lp = 2000,
-	.trasmin = 4250,
-};
-
-struct mx6_ddr_sysinfo ddr_sysinfo = {
-	.dsize = 0,
-	.cs_density = 18,
-	.ncs = 1,
-	.cs1_mirror = 0,
-	.walat = 0,
-	.ralat = 5,
-	.mif3_mode = 3,
-	.bi_on = 1,
-	.rtt_wr = 0,        /* LPDDR2 does not need rtt_wr rtt_nom */
-	.rtt_nom = 0,
-	.sde_to_rst = 0,    /* LPDDR2 does not need this field */
-	.rst_to_cke = 0x10, /* JEDEC value for LPDDR2: 200us */
-	.ddr_type = DDR_TYPE_LPDDR2,
-	.refsel = 0,	/* Refresh cycles at 64KHz */
-	.refr = 3,	/* 4 refresh commands per refresh cycle */
-};
-
-#else
-static struct mx6ul_iomux_ddr_regs mx6_ddr_ioregs = {
-	.dram_dqm0 = 0x00000030,
-	.dram_dqm1 = 0x00000030,
-	.dram_ras = 0x00000030,
-	.dram_cas = 0x00000030,
-	.dram_odt0 = 0x00000030,
-	.dram_odt1 = 0x00000030,
-	.dram_sdba2 = 0x00000000,
-	.dram_sdclk_0 = 0x00000030,
-	.dram_sdqs0 = 0x00000030,
-	.dram_sdqs1 = 0x00000030,
-	.dram_reset = 0x00000030,
-};
-
-static struct mx6_mmdc_calibration mx6_mmcd_calib = {
-	.p0_mpwldectrl0 = 0x00000000,
-	.p0_mpdgctrl0 = 0x41570155,
-	.p0_mprddlctl = 0x4040474A,
-	.p0_mpwrdlctl = 0x40405550,
-};
-
-struct mx6_ddr_sysinfo ddr_sysinfo = {
-	.dsize = 0,
-	.cs_density = 20,
-	.ncs = 1,
-	.cs1_mirror = 0,
-	.rtt_wr = 2,
-	.rtt_nom = 1,		/* RTT_Nom = RZQ/2 */
-	.walat = 0,		/* Write additional latency */
-	.ralat = 5,		/* Read additional latency */
-	.mif3_mode = 3,		/* Command prediction working mode */
-	.bi_on = 1,		/* Bank interleaving enabled */
-	.sde_to_rst = 0x10,	/* 14 cycles, 200us (JEDEC default) */
-	.rst_to_cke = 0x23,	/* 33 cycles, 500us (JEDEC default) */
-	.ddr_type = DDR_TYPE_DDR3,
-	.refsel = 0,	/* Refresh cycles at 64KHz */
-	.refr = 1,	/* 2 refresh commands per refresh cycle */
-};
-
-static struct mx6_ddr3_cfg mem_ddr = {
-	.mem_speed = 800,
-	.density = 4,
-	.width = 16,
-	.banks = 8,
-	.rowaddr = 15,
-	.coladdr = 10,
-	.pagesz = 2,
-	.trcd = 1375,
-	.trcmin = 4875,
-	.trasmin = 3500,
-};
-#endif
-
-static void ccgr_init(void)
-{
-	struct mxc_ccm_reg *ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
-
-	writel(0xFFFFFFFF, &ccm->CCGR0);
-	writel(0xFFFFFFFF, &ccm->CCGR1);
-	writel(0xFFFFFFFF, &ccm->CCGR2);
-	writel(0xFFFFFFFF, &ccm->CCGR3);
-	writel(0xFFFFFFFF, &ccm->CCGR4);
-	writel(0xFFFFFFFF, &ccm->CCGR5);
-	writel(0xFFFFFFFF, &ccm->CCGR6);
-	writel(0xFFFFFFFF, &ccm->CCGR7);
-}
-
-static void spl_dram_init(void)
-{
-	mx6ul_dram_iocfg(mem_ddr.width, &mx6_ddr_ioregs, &mx6_grp_ioregs);
-	mx6_dram_cfg(&ddr_sysinfo, &mx6_mmcd_calib, &mem_ddr);
-}
-
-void board_init_f(ulong dummy)
-{
-	ccgr_init();
-
-	/* setup AIPS and disable watchdog */
-	arch_cpu_init();
-
-	/* iomux and setup of i2c */
-	board_early_init_f();
-
-	/* setup GP timer */
-	timer_init();
-
-	/* UART clocks enabled and gd valid - init serial console */
-	preloader_console_init();
-
-	/* DDR initialization */
-	spl_dram_init();
-
-	/* Clear the BSS. */
-	memset(__bss_start, 0, __bss_end - __bss_start);
-
-	/* load/boot image from boot device */
-	board_init_r(NULL, 0);
-}
-#endif

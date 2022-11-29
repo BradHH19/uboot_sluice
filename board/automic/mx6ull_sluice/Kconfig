@@ -1,0 +1,14 @@
+if TARGET_MX6ULL_14X14_SLUICE || TARGET_MX6ULL_9X9_SLUICE
+
+config SYS_BOARD
+	default "mx6ull_sluice"
+
+config SYS_VENDOR
+	default "automic"
+
+config SYS_CONFIG_NAME
+	default "mx6ull_sluice"
+
+config SYS_TEXT_BASE
+	default 0x87800000
+endif
